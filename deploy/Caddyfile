@@ -1,0 +1,13 @@
+# Caddyfile — automatic HTTPS in front of The Weigh Off.
+#
+# Replace the domain below with your No-IP hostname.
+# Caddy will fetch and renew a Let's Encrypt certificate automatically,
+# then reverse-proxy to the Python server on 127.0.0.1:8770.
+#
+# For HTTPS to work, port 443 (and 80, for the ACME challenge) must be
+# forwarded through your firewall/router to this box.
+
+yourname.ddns.net {
+    encode gzip
+    reverse_proxy 127.0.0.1:8770
+}

@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Weigh Off</title>
+<script src="https://artifactcdn.diabrowser.engineering/ajax/libs/Chart.js/chart.umd.js"></script>
+<style>
+  :root{
+    --ink:#1d2333;
+    --paper:#fbf7ef;
+    --card:#ffffff;
+    --line:#e7ded0;
+    --brand:#e0453f;      /* tomato red */
+    --brand-2:#f5a623;    /* marigold */
+    --win:#1f9d68;        /* fresh green */
+    --lose:#c9772f;       /* burnt orange */
+    --muted:#7c7566;
+    --shadow:0 10px 30px rgba(40,30,10,.10),0 2px 6px rgba(40,30,10,.06);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    background:
+      radial-gradient(circle at 12% 8%, #fff4e0 0, transparent 42%),
+      radial-gradient(circle at 88% 4%, #ffe4e0 0, transparent 38%),
+      var(--paper);
+    color:var(--ink);
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+    padding-bottom:64px;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:28px 22px 40px}
+  header.masthead{
+    text-align:center;position:relative;padding:14px 0 10px;
+    border-bottom:3px double var(--ink);margin-bottom:24px;
+  }
+  .kicker{
+    font-family:"Helvetica Neue",Arial,sans-serif;
+    text-transform:uppercase;letter-spacing:.32em;font-size:11px;
+    color:var(--brand);font-weight:700;margin-bottom:4px;
+  }
+  h1{
+    margin:0;font-size:clamp(38px,7vw,66px);line-height:.92;
+    letter-spacing:-.5px;font-weight:800;
+  }
+  h1 .amp{color:var(--brand);font-style:italic}
+  .dek{font-style:italic;color:var(--muted);margin-top:8px;font-size:15px}
+  .disclaimer{
+    font-family:"Helvetica Neue",Arial,sans-serif;font-size:11px;color:var(--muted);
+    max-width:640px;margin:10px auto 0;line-height:1.5;
+  }
+
+  /* toolbar */
+  .toolbar{
+    display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;
+    background:var(--card);border:1px solid var(--line);border-radius:14px;
+    padding:12px 16px;box-shadow:var(--shadow);margin-bottom:22px;
+  }
+  .unit-toggle{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:3px;background:#f2eadd}
+  .unit-toggle button{
+    font-family:"Helvetica Neue",Arial,sans-serif;font-weight:700;font-size:12px;letter-spacing:.04em;
+    border:0;background:transparent;color:var(--muted);padding:7px 16px;border-radius:999px;cursor:pointer;transition:.15s;
+  }
+  .unit-toggle button.active{background:var(--ink);color:#fff}
+  #metricToggle{padding:2px}
+  #metricToggle button{padding:5px 12px;font-size:11px}
+  .quarter-badge{font-family:"Helvetica Neue",Arial,sans-serif;font-size:12.5px;color:var(--muted);text-align:right;line-height:1.4}
+  .quarter-badge b{color:var(--ink);font-size:14px;display:block}
+
+  /* grid */
+  .grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:22px}
+  @media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:20px;min-width:0}
+  .card h2{
+    font-family:"Helvetica Neue",Arial,sans-serif;font-size:12px;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--muted);margin:0 0 14px;font-weight:800;
+  }
+
+  /* chart */
+  .chart-wrap{position:relative;width:100%;height:clamp(260px,42vh,380px);overflow:hidden}
+
+  /* leaderboard */
+  .lb-row{
+    display:flex;align-items:center;gap:12px;padding:12px 4px;border-bottom:1px dashed var(--line);
+  }
+  .lb-row:last-child{border-bottom:0}
+  .rank{font-family:"Helvetica Neue",Arial,sans-serif;font-weight:800;font-size:20px;width:26px;text-align:center;color:var(--muted)}
+  .rank.gold{color:#d4a017}
+  .swatch{width:12px;height:12px;border-radius:50%;flex:none}
+  .lb-name{flex:1;font-weight:700;font-size:16px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lb-name small{display:block;font-family:"Helvetica Neue",Arial,sans-serif;font-weight:400;font-size:11px;color:var(--muted)}
+  .lb-delta{font-family:"Helvetica Neue",Arial,sans-serif;font-weight:800;font-size:16px;text-align:right}
+  .lb-delta.win{color:var(--win)}
+  .lb-delta.lose{color:var(--lose)}
+  .lb-delta.flat{color:var(--muted)}
+  .stars{color:#e8b21e;font-size:13px;letter-spacing:1px;vertical-align:1px}
+
+  /* hall of fame */
+  .hof-quarter{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:12px;background:#fdfbf6}
+  .hof-quarter:last-child{margin-bottom:0}
+  .hof-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}
+  .hof-head .q{font-weight:800;font-size:17px}
+  .hof-head .dt{font-family:"Helvetica Neue",Arial,sans-serif;font-size:11px;color:var(--muted)}
+  .hof-badges{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+  .hof-badge{font-family:"Helvetica Neue",Arial,sans-serif;font-size:12px;font-weight:700;padding:5px 10px;border-radius:999px}
+  .hof-badge.win{background:#e3f5ec;color:var(--win)}
+  .hof-badge.cook{background:#fdeee0;color:var(--lose)}
+  .hof-standing{display:flex;align-items:center;gap:8px;font-family:"Helvetica Neue",Arial,sans-serif;font-size:12.5px;padding:3px 0}
+  .hof-standing .nm{flex:1}
+  .hof-standing .sc{font-weight:700}
+  .career-tbl{width:100%;border-collapse:collapse;font-family:"Helvetica Neue",Arial,sans-serif;font-size:13px}
+  .career-tbl th{text-align:left;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;font-size:10px;padding:6px 8px;border-bottom:1px solid var(--line)}
+  .career-tbl td{padding:8px;border-bottom:1px solid #f3ece0}
+  .career-tbl tr:last-child td{border-bottom:0}
+
+  .loser-callout{
+    margin-top:16px;padding:14px;border-radius:12px;text-align:center;
+    background:linear-gradient(135deg,#fff2e6,#ffe0dc);border:1px dashed var(--brand);
+  }
+  .loser-callout .lbl{font-family:"Helvetica Neue",Arial,sans-serif;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--lose);font-weight:800}
+  .loser-callout .who{font-size:22px;font-weight:800;margin-top:4px}
+  .loser-callout .sub{font-style:italic;color:var(--muted);font-size:13px;margin-top:4px}
+
+  /* people mgmt */
+  .person-chip{
+    display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);
+    border-radius:10px;margin-bottom:8px;background:#fdfbf6;
+  }
+  .person-chip .swatch{width:14px;height:14px}
+  .person-chip .pname{flex:1;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .person-chip .ph{font-family:"Helvetica Neue",Arial,sans-serif;font-size:11px;color:var(--muted)}
+  .icon-btn{border:0;background:transparent;cursor:pointer;color:var(--muted);font-size:16px;padding:4px}
+  .icon-btn:hover{color:var(--brand)}
+
+  label.fld{display:block;font-family:"Helvetica Neue",Arial,sans-serif;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:10px 0 4px}
+  input,select{
+    width:100%;font-family:"Helvetica Neue",Arial,sans-serif;font-size:15px;padding:10px 12px;
+    border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink);
+  }
+  input:focus,select:focus{outline:2px solid var(--brand-2);outline-offset:0;border-color:transparent}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .row3{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .btn{
+    font-family:"Helvetica Neue",Arial,sans-serif;font-weight:800;letter-spacing:.04em;font-size:14px;
+    border:0;border-radius:10px;padding:12px 16px;cursor:pointer;width:100%;margin-top:14px;transition:.15s transform;
+    background:var(--brand);color:#fff;
+  }
+  .btn:hover{transform:translateY(-1px)}
+  .btn.ghost{background:var(--ink)}
+  .btn.mini{width:auto;padding:8px 14px;margin-top:0;font-size:12px}
+
+  .bmi-preview{
+    font-family:"Helvetica Neue",Arial,sans-serif;text-align:center;margin-top:12px;font-size:13px;color:var(--muted);
+  }
+  .bmi-preview b{font-size:26px;color:var(--ink);display:block;font-family:inherit}
+  .bmi-cat{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.05em;margin-top:4px}
+
+  .empty{font-style:italic;color:var(--muted);font-size:14px;text-align:center;padding:20px 0}
+
+  /* log table */
+  .log-table{width:100%;border-collapse:collapse;font-family:"Helvetica Neue",Arial,sans-serif;font-size:13px}
+  .log-table th{text-align:left;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;font-size:10px;padding:6px 8px;border-bottom:1px solid var(--line)}
+  .log-table td{padding:8px;border-bottom:1px solid #f3ece0}
+  .log-table tr:last-child td{border-bottom:0}
+  .trend-up{color:var(--win);font-weight:700}
+  .trend-down{color:var(--lose);font-weight:700}
+
+  .section-gap{margin-top:22px}
+  footer.foot{text-align:center;margin-top:30px;font-family:"Helvetica Neue",Arial,sans-serif;font-size:11px;color:var(--muted);line-height:1.6}
+
+  /* fireworks canvas */
+  #fx{position:fixed;inset:0;pointer-events:none;z-index:60;display:none}
+
+  /* login overlay */
+  #loginOverlay{position:fixed;inset:0;z-index:90;display:none;align-items:center;justify-content:center;
+    background:rgba(40,30,10,.55);backdrop-filter:blur(3px)}
+  .login-card{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);
+    padding:28px;max-width:360px;width:90%;text-align:center}
+  .login-card input{margin-top:4px}
+
+  /* toast */
+  #toast{
+    position:fixed;left:50%;top:22px;transform:translateX(-50%) translateY(-140%);
+    background:var(--ink);color:#fff;padding:14px 22px;border-radius:12px;z-index:70;
+    font-family:"Helvetica Neue",Arial,sans-serif;font-weight:700;font-size:15px;box-shadow:var(--shadow);
+    transition:transform .4s cubic-bezier(.2,1.3,.4,1);text-align:center;max-width:88vw;
+  }
+  #toast.show{transform:translateX(-50%) translateY(0)}
+  #toast.win{background:var(--win)}
+  #toast.lose{background:var(--lose)}
+  #toast .big{font-size:20px;display:block}
+
+  @media print{
+    .toolbar,.person-panel,.btn,#fx,#toast{display:none!important}
+    body{background:#fff}
+    .card{box-shadow:none;break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+<canvas id="fx"></canvas>
+<div id="toast"></div>
+
+<div id="loginOverlay">
+  <div class="login-card">
+    <div class="kicker" style="color:var(--brand)">The Weigh Off</div>
+    <h2 style="margin:6px 0 4px;font-size:26px">Enter the passphrase</h2>
+    <p style="font-family:'Helvetica Neue',Arial,sans-serif;font-size:13px;color:var(--muted);margin:0 0 16px">Ask whoever set up the tracker for the shared passphrase.</p>
+    <input id="passInput" type="password" placeholder="Passphrase" autocomplete="current-password">
+    <div id="loginErr" style="color:var(--brand);font-family:'Helvetica Neue',Arial,sans-serif;font-size:12px;min-height:16px;margin-top:6px"></div>
+    <button class="btn" id="loginBtn">Enter</button>
+  </div>
+</div>
+
+<div class="wrap">
+  <header class="masthead">
+    <div class="kicker">A friendly reckoning &middot; every 90 days</div>
+    <h1>The Weigh <span class="amp">Off</span></h1>
+    <p class="dek">Log your weight, watch the lines race, and don&rsquo;t be the one cooking dinner.</p>
+    <p class="disclaimer">A bit of fun between friends &mdash; not medical advice, and not your main plan for getting healthy. The standard WHO thresholds used here fit white adults over 30. BMI is a rough screen (it can&rsquo;t tell muscle from fat), so there&rsquo;s an optional waist tracker too &mdash; for middle-aged adults, waist size is a better guide to health risk than BMI alone. If in doubt, talk to a GP or pharmacist.</p>
+  </header>
+
+  <div class="toolbar">
+    <div class="unit-toggle" id="unitToggle">
+      <button data-u="metric" class="active">Metric &middot; kg / cm</button>
+      <button data-u="imperial">Imperial &middot; st&middot;lb / ft&middot;in</button>
+    </div>
+    <div class="quarter-badge" id="quarterBadge">
+      <b>Loading&hellip;</b>
+      until the next reckoning
+    </div>
+  </div>
+
+  <div class="grid">
+    <!-- LEFT: chart + leaderboard + log -->
+    <div>
+      <div class="card">
+        <h2 style="display:flex;justify-content:space-between;align-items:center">
+          <span id="chartTitle">The Race &middot; BMI over time</span>
+          <span class="unit-toggle" id="metricToggle" style="text-transform:none;letter-spacing:0">
+            <button data-m="bmi" class="active">BMI</button>
+            <button data-m="waist">Waist</button>
+          </span>
+        </h2>
+        <div class="chart-wrap"><canvas id="chart"></canvas></div>
+      </div>
+
+      <div class="card section-gap">
+        <h2>Leaderboard &middot; combined score (50% weight, 50% waist)</h2>
+        <div id="leaderboard"><p class="empty">Add a couple of friends and log a weigh-in to start the race.</p></div>
+        <div id="loserCallout"></div>
+      </div>
+
+      <div class="card section-gap">
+        <h2>Weigh-in log</h2>
+        <div id="logArea"><p class="empty">No entries yet.</p></div>
+      </div>
+
+      <div class="card section-gap">
+        <h2>Career standings &middot; the whole year</h2>
+        <div id="careerArea"><p class="empty">Gold stars and quarter wins tally up here as the year runs.</p></div>
+      </div>
+
+      <div class="card section-gap">
+        <h2>Hall of Fame &middot; past quarters</h2>
+        <div id="hofArea"><p class="empty">The first quarter&rsquo;s result gets banked here once it closes (every 90 days).</p></div>
+      </div>
+    </div>
+
+    <!-- RIGHT: manage people + log weight -->
+    <div class="person-panel">
+      <div class="card">
+        <h2>Log a weigh-in</h2>
+        <label class="fld" for="logPerson">Who</label>
+        <select id="logPerson"></select>
+        <label class="fld" id="weightLbl" for="w1">Weight (kg)</label>
+        <div class="row3">
+          <input id="w1" type="number" step="0.1" placeholder="kg">
+          <input id="w2" type="number" step="0.1" placeholder="lb" style="display:none">
+        </div>
+        <label class="fld" id="waistLbl" for="waist">Waist &mdash; optional (cm)</label>
+        <input id="waist" type="number" step="0.1" placeholder="around the belly button">
+        <div class="bmi-preview" id="bmiPreview"></div>
+        <button class="btn" id="logBtn">Record weigh-in</button>
+      </div>
+
+      <div class="card section-gap">
+        <h2>The Contenders</h2>
+        <div id="peopleList"><p class="empty">No one added yet.</p></div>
+        <label class="fld" for="pName">Name</label>
+        <input id="pName" type="text" placeholder="e.g. Dave">
+        <div class="row2">
+          <div>
+            <label class="fld" for="pSex">Sex</label>
+            <select id="pSex"><option value="m">Male</option><option value="f">Female</option></select>
+          </div>
+          <div>
+            <label class="fld" id="heightLbl">Height (cm)</label>
+            <div class="row2">
+              <input id="h1" type="number" step="0.1" placeholder="cm">
+              <input id="h2" type="number" step="1" placeholder="in" style="display:none">
+            </div>
+          </div>
+        </div>
+        <button class="btn ghost" id="addPersonBtn">Add contender</button>
+      </div>
+
+      <div class="card section-gap">
+        <h2>Data</h2>
+        <p style="font-family:Helvetica Neue,Arial,sans-serif;font-size:12.5px;color:var(--muted);margin:0 0 12px;line-height:1.5">
+          Saved on your server &mdash; everyone with the passphrase shares one board. Export is a manual backup of the whole thing.
+        </p>
+        <div style="display:flex;gap:8px">
+          <button class="btn mini ghost" id="exportBtn">Export</button>
+          <button class="btn mini ghost" id="importBtn">Import</button>
+          <button class="btn mini" id="demoBtn">Demo data</button>
+        </div>
+        <input type="file" id="importFile" accept="application/json" style="display:none">
+      </div>
+    </div>
+  </div>
+
+  <footer class="foot">
+    The Weigh Off &middot; a friendly quarterly challenge<br>
+    Scored 50/50 on percentage of weight and waist lost, so it rewards real fat loss &mdash; not just a dry-out before weigh-in. Anyone without a waist reading is scored on weight alone.
+  </footer>
+</div>
+
+<script>
+/* ---------------- state ---------------- */
+const PALETTE = ["#e0453f","#2f7fd6","#1f9d68","#f5a623","#8e4bd0","#d63384","#0f9b9b","#c9772f"];
+const UNIT_KEY = "weighoff_unit";      // unit is a per-device display preference
+const TOKEN_KEY = "weighoff_token";    // session token from the passphrase login
+let state = { people:[], unit:"metric", history:[] };
+let unit = localStorage.getItem(UNIT_KEY) || "metric";
+let TOKEN = localStorage.getItem(TOKEN_KEY) || "";
+
+function authHeaders(){ return TOKEN ? { "Authorization":"Bearer "+TOKEN } : {}; }
+
+// Load the shared state from our own server.
+async function load(){
+  const res = await fetch("/api/state", { headers: authHeaders() });
+  if(res.status === 401){ showLogin(); throw new Error("unauthorized"); }
+  const data = await res.json();
+  return { people:data.people||[], history:data.history||[], unit };
+}
+// Push the whole picture back to the server (server does a full replace).
+let saveTimer = null;
+async function save(){
+  localStorage.setItem(UNIT_KEY, unit);
+  // debounce rapid successive saves (e.g. during render) into one request
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async ()=>{
+    try{
+      const res = await fetch("/api/state", {
+        method:"POST",
+        headers: Object.assign({ "Content-Type":"application/json" }, authHeaders()),
+        body: JSON.stringify({ people:state.people, history:state.history })
+      });
+      if(res.status === 401){ showLogin(); }
+    }catch(e){ /* offline; will resend on next change */ }
+  }, 250);
+}
+function uid(){ return Math.random().toString(36).slice(2,9); }
+
+/* ---------------- unit helpers ---------------- */
+// canonical storage: height in cm, weight in kg
+function bmi(kg, cm){ const m = cm/100; return kg/(m*m); }
+function bmiCategory(b){
+  if(b<18.5) return ["Underweight","#3a7bd5"];
+  if(b<25) return ["Healthy","#1f9d68"];
+  if(b<30) return ["Overweight","#f5a623"];
+  if(b<35) return ["Obese I","#e07b2f"];
+  if(b<40) return ["Obese II","#e0453f"];
+  return ["Obese III","#b02622"];
+}
+// display conversions
+function kgToStLb(kg){ const totalLb = kg*2.2046226; const st=Math.floor(totalLb/14); const lb=totalLb-st*14; return {st, lb}; }
+function cmToFtIn(cm){ const totalIn = cm/2.54; const ft=Math.floor(totalIn/12); const inch=totalIn-ft*12; return {ft, inch}; }
+
+// waist risk (WHO / NIH): thresholds differ by sex. Stored in cm.
+function waistRisk(cm, sex){
+  const high = sex==="f" ? 88 : 102;   // "substantially increased risk"
+  const raised = sex==="f" ? 80 : 94;  // "increased risk"
+  if(cm>=high) return ["High risk","#e0453f"];
+  if(cm>=raised) return ["Raised risk","#f5a623"];
+  return ["Lower risk","#1f9d68"];
+}
+let chartMetric = "bmi"; // "bmi" | "waist"
+
+/* ---------------- quarter logic ---------------- */
+// A "quarter" = rolling 90-day window anchored to Jan 1 of current year, then every 90 days.
+function quarterStart(d=new Date()){
+  const yearStart = new Date(d.getFullYear(),0,1);
+  const days = Math.floor((d - yearStart)/86400000);
+  const q = Math.floor(days/90);
+  return new Date(yearStart.getTime() + q*90*86400000);
+}
+function quarterEnd(d=new Date()){ return new Date(quarterStart(d).getTime() + 90*86400000); }
+function daysLeft(){ return Math.ceil((quarterEnd() - new Date())/86400000); }
+// Stable label + key for a quarter, e.g. "Q3 2026"
+function quarterKey(d=new Date()){
+  const ys = new Date(d.getFullYear(),0,1);
+  const q = Math.floor(Math.floor((d - ys)/86400000)/90) + 1;
+  return `Q${q} ${d.getFullYear()}`;
+}
+
+/* ---------------- gold stars ---------------- */
+// Reward CONSISTENT loss: for each completed 14-day fortnight, if the person ended
+// down by a healthy amount (0.3-1.5 kg ~ 0.25-0.75 kg/week), they earn ONE star.
+// Losing more than the cap earns no extra star (discourages crash dieting).
+const STAR_MIN = 0.3, STAR_MAX = 1.5, FORTNIGHT = 14*86400000;
+function goldStars(p){
+  const es = (p.entries||[]).slice().sort((a,b)=>new Date(a.date)-new Date(b.date));
+  if(es.length<2) return { stars:0, streak:0, capped:0 };
+  const first = new Date(es[0].date).getTime();
+  const now = Date.now();
+  // Snap the fortnight grid to the person's first entry.
+  let stars=0, capped=0, streak=0, bestStreak=0;
+  // Weight at a given time = most recent entry at/before that time.
+  const weightAt = (t)=>{ let w=null; for(const e of es){ if(new Date(e.date).getTime()<=t) w=e.kg; } return w; };
+  for(let start=first; start+FORTNIGHT<=now+86400000; start+=FORTNIGHT){
+    const wStart = weightAt(start);
+    const wEnd = weightAt(start+FORTNIGHT);
+    if(wStart==null || wEnd==null) { streak=0; continue; }
+    const drop = wStart - wEnd; // positive = lost
+    if(drop >= STAR_MIN){
+      stars++; streak++; bestStreak=Math.max(bestStreak,streak);
+      if(drop > STAR_MAX) capped++;   // lost more than healthy this fortnight
+    } else {
+      streak=0;
+    }
+  }
+  return { stars, streak:bestStreak, capped };
+}
+
+/* ---------------- quarter close / history ---------------- */
+// Score a person over an explicit [start,end) window (used for archiving finished quarters).
+function progressInWindow(p, startMs, endMs){
+  const sorted = (p.entries||[]).slice().sort((a,b)=>new Date(a.date)-new Date(b.date));
+  const inWin = sorted.filter(e=>{ const t=new Date(e.date).getTime(); return t>=startMs && t<endMs; });
+  if(inWin.length<1) return null;
+  const baseline = inWin[0], latest = inWin[inWin.length-1];
+  const pct = ((baseline.kg - latest.kg)/baseline.kg)*100;
+  const ww = inWin.filter(e=>e.waist!=null);
+  let waistPct=null;
+  if(ww.length>=2) waistPct = ((ww[0].waist - ww[ww.length-1].waist)/ww[0].waist)*100;
+  const hasWaist = waistPct!==null;
+  const score = hasWaist ? pct*0.5 + waistPct*0.5 : pct;
+  return { pct, waistPct, hasWaist, score };
+}
+// On load, bank any quarter that has fully finished and isn't recorded yet.
+function archiveFinishedQuarters(){
+  if(!state.people.length) return;
+  // earliest entry date across everyone = when the game began
+  let earliest = Infinity;
+  state.people.forEach(p=>(p.entries||[]).forEach(e=>earliest=Math.min(earliest,new Date(e.date).getTime())));
+  if(!isFinite(earliest)) return;
+  const curStart = quarterStart().getTime();
+  const done = new Set(state.history.map(h=>h.key));
+  // Walk each quarter boundary from the start up to (not including) the current one.
+  for(let qs=quarterStart(new Date(earliest)).getTime(); qs<curStart; qs+=90*86400000){
+    const qe = qs+90*86400000;
+    const key = quarterKey(new Date(qs));
+    if(done.has(key)) continue;
+    const results = state.people.map(p=>({ id:p.id, name:p.name, color:p.color,
+      prog:progressInWindow(p, qs, qe) })).filter(r=>r.prog)
+      .sort((a,b)=>b.prog.score - a.prog.score);
+    if(results.length>=1){
+      state.history.push({
+        key, endISO:new Date(qe).toISOString().slice(0,10),
+        winner: results[0]?.name || null,
+        cook: results.length>=2 ? results[results.length-1].name : null,
+        standings: results.map(r=>({name:r.name,color:r.color,score:+r.prog.score.toFixed(1),
+          pct:+r.prog.pct.toFixed(1), waistPct:r.prog.hasWaist?+r.prog.waistPct.toFixed(1):null}))
+      });
+    }
+  }
+}
+
+/* weight at or nearest-after quarter start, and latest weight */
+function quarterProgress(p){
+  if(!p.entries || p.entries.length===0) return null;
+  const qs = quarterStart().getTime();
+  const sorted = [...p.entries].sort((a,b)=>new Date(a.date)-new Date(b.date));
+  // baseline = last entry at or before quarter start, else first entry in quarter
+  let baseline = null;
+  for(const e of sorted){ if(new Date(e.date).getTime() <= qs) baseline = e; }
+  if(!baseline) baseline = sorted.find(e=>new Date(e.date).getTime() >= qs) || sorted[0];
+  const latest = sorted[sorted.length-1];
+  const pct = ((baseline.kg - latest.kg)/baseline.kg)*100; // positive = lost weight
+
+  // Waist: need a baseline waist and a latest waist within the same window.
+  // Baseline waist = the baseline entry's waist if present, else the earliest waist in the window.
+  const withWaist = sorted.filter(e=>e.waist!=null);
+  let waistPct = null, waistBaseline = null, waistLatest = null;
+  if(withWaist.length>=1){
+    waistBaseline = (baseline.waist!=null) ? baseline
+      : (withWaist.find(e=>new Date(e.date).getTime() >= qs) || withWaist[0]);
+    waistLatest = withWaist[withWaist.length-1];
+    // Only score waist if we have two distinct readings to compare.
+    if(waistBaseline && waistLatest && waistBaseline.id !== waistLatest.id){
+      waistPct = ((waistBaseline.waist - waistLatest.waist)/waistBaseline.waist)*100;
+    }
+  }
+
+  // Combined 50/50 when a real waist comparison exists; otherwise weight-only.
+  const hasWaist = waistPct !== null;
+  const score = hasWaist ? (pct*0.5 + waistPct*0.5) : pct;
+
+  return { baseline, latest, pct, waistPct, waistBaseline, waistLatest, hasWaist, score };
+}
+
+/* ---------------- rendering ---------------- */
+let chart;
+function render(){
+  renderQuarter();
+  renderPeopleSelect();
+  renderPeopleList();
+  renderLeaderboard();
+  renderCareer();
+  renderHOF();
+  renderLog();
+  renderChart();
+  updateBmiPreview();
+  save();
+}
+
+function renderQuarter(){
+  const dl = daysLeft();
+  const end = quarterEnd().toLocaleDateString(undefined,{day:'numeric',month:'short'});
+  document.getElementById("quarterBadge").innerHTML =
+    `<b>${dl} day${dl===1?'':'s'}</b> until the reckoning (${end})`;
+}
+
+function renderPeopleSelect(){
+  const sel = document.getElementById("logPerson");
+  sel.innerHTML = state.people.length
+    ? state.people.map(p=>`<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("")
+    : `<option value="">— add a contender first —</option>`;
+}
+
+function renderPeopleList(){
+  const el = document.getElementById("peopleList");
+  if(!state.people.length){ el.innerHTML = `<p class="empty">No one added yet.</p>`; return; }
+  el.innerHTML = state.people.map(p=>{
+    let h;
+    if(unit==="metric") h = `${p.cm} cm`;
+    else { const {ft,inch}=cmToFtIn(p.cm); h = `${ft}&prime;${Math.round(inch)}&Prime;`; }
+    return `<div class="person-chip">
+      <span class="swatch" style="background:${p.color}"></span>
+      <span class="pname">${escapeHtml(p.name)} <span class="ph">&middot; ${h}</span></span>
+      <button class="icon-btn" title="Remove" data-del="${p.id}">&times;</button>
+    </div>`;
+  }).join("");
+  el.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{
+    if(confirm("Remove this contender and all their weigh-ins?")){
+      state.people = state.people.filter(x=>x.id!==b.dataset.del); render();
+    }
+  });
+}
+
+function renderLeaderboard(){
+  const el = document.getElementById("leaderboard");
+  const callout = document.getElementById("loserCallout");
+  const ranked = state.people
+    .map(p=>({p, prog:quarterProgress(p)}))
+    .filter(x=>x.prog)
+    .sort((a,b)=>b.prog.score - a.prog.score); // best combined score first
+
+  if(!ranked.length){
+    el.innerHTML = `<p class="empty">Add a couple of friends and log a weigh-in to start the race.</p>`;
+    callout.innerHTML = ""; return;
+  }
+  el.innerHTML = ranked.map((x,i)=>{
+    const s = x.prog.score;
+    const cls = s>0.05?"win":s<-0.05?"lose":"flat";
+    const arrow = s>0.05?"&#9660;":s<-0.05?"&#9650;":"&middot;";
+    // Breakdown line: weight always, waist when present.
+    let breakdown = `Wt ${x.prog.pct>=0?'&minus;':'+'}${Math.abs(x.prog.pct).toFixed(1)}%`;
+    if(x.prog.hasWaist){
+      breakdown += ` &middot; Waist ${x.prog.waistPct>=0?'&minus;':'+'}${Math.abs(x.prog.waistPct).toFixed(1)}%`;
+    } else {
+      breakdown += ` &middot; <span style="color:var(--lose)">no waist yet</span>`;
+    }
+    const gs = goldStars(x.p);
+    const starRow = gs.stars>0
+      ? `<span class="stars" title="${gs.stars} gold star${gs.stars===1?'':'s'} for consistent loss">${'&#9733;'.repeat(Math.min(gs.stars,10))}${gs.stars>10?' &times;'+gs.stars:''}</span>`
+      : "";
+    return `<div class="lb-row">
+      <span class="rank ${i===0?'gold':''}">${i+1}</span>
+      <span class="swatch" style="background:${x.p.color}"></span>
+      <span class="lb-name">${escapeHtml(x.p.name)} ${starRow}<small>${breakdown}</small></span>
+      <span class="lb-delta ${cls}">${arrow} ${Math.abs(s).toFixed(1)}</span>
+    </div>`;
+  }).join("");
+
+  if(ranked.length>=2){
+    const loser = ranked[ranked.length-1];
+    const winner = ranked[0];
+    callout.innerHTML = `<div class="loser-callout">
+      <div class="lbl">Currently on cooking duty</div>
+      <div class="who">${escapeHtml(loser.p.name)} &#127859;</div>
+      <div class="sub">${winner.prog.score>0? escapeHtml(winner.p.name)+' is leading with a &minus;'+winner.prog.score.toFixed(1)+' score':'No one&rsquo;s pulled ahead yet &mdash; game on.'}</div>
+    </div>`;
+  } else { callout.innerHTML = ""; }
+}
+
+function renderCareer(){
+  const el = document.getElementById("careerArea");
+  if(!state.people.length){ el.innerHTML = `<p class="empty">Gold stars and quarter wins tally up here as the year runs.</p>`; return; }
+  const rows = state.people.map(p=>{
+    const gs = goldStars(p);
+    const wins = state.history.filter(h=>h.winner===p.name).length;
+    const cooks = state.history.filter(h=>h.cook===p.name).length;
+    return { p, stars:gs.stars, streak:gs.streak, wins, cooks };
+  }).sort((a,b)=> (b.stars-a.stars) || (b.wins-a.wins));
+  el.innerHTML = `<table class="career-tbl">
+    <thead><tr><th>Who</th><th>Gold stars</th><th>Best streak</th><th>Quarters won</th><th>Meals cooked</th></tr></thead>
+    <tbody>${rows.map(r=>`<tr>
+      <td><span class="swatch" style="display:inline-block;background:${r.p.color};margin-right:6px"></span>${escapeHtml(r.p.name)}</td>
+      <td><span class="stars">${r.stars>0?'&#9733;':''}</span> ${r.stars}</td>
+      <td>${r.streak}&times;</td>
+      <td>${r.wins} &#127942;</td>
+      <td>${r.cooks} &#127859;</td>
+    </tr>`).join("")}</tbody></table>
+    <p style="font-family:Helvetica Neue,Arial,sans-serif;font-size:11px;color:var(--muted);margin:10px 0 0;line-height:1.5">
+      A gold star for every fortnight you end down ${STAR_MIN}&ndash;${STAR_MAX}kg &mdash; steady loss, not crash dieting. Bigger single drops don&rsquo;t earn extra.</p>`;
+}
+
+function renderHOF(){
+  const el = document.getElementById("hofArea");
+  if(!state.history.length){
+    el.innerHTML = `<p class="empty">The first quarter&rsquo;s result gets banked here once it closes (every 90 days).</p>`;
+    return;
+  }
+  const items = state.history.slice().reverse().map(h=>{
+    const badges = [];
+    if(h.winner) badges.push(`<span class="hof-badge win">&#127942; ${escapeHtml(h.winner)} won</span>`);
+    if(h.cook) badges.push(`<span class="hof-badge cook">&#127859; ${escapeHtml(h.cook)} cooked</span>`);
+    const standings = h.standings.map(s=>{
+      const w = s.waistPct!=null ? ` &middot; waist ${s.waistPct>=0?'&minus;':'+'}${Math.abs(s.waistPct)}%` : '';
+      return `<div class="hof-standing">
+        <span class="swatch" style="background:${s.color}"></span>
+        <span class="nm">${escapeHtml(s.name)}</span>
+        <span class="sc">${s.score>=0?'&minus;':'+'}${Math.abs(s.score)}</span></div>`;
+    }).join("");
+    return `<div class="hof-quarter">
+      <div class="hof-head"><span class="q">${h.key}</span><span class="dt">closed ${new Date(h.endISO).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'})}</span></div>
+      <div class="hof-badges">${badges.join("")}</div>
+      ${standings}
+    </div>`;
+  }).join("");
+  el.innerHTML = items;
+}
+
+function renderLog(){
+  const el = document.getElementById("logArea");
+  const all = [];
+  state.people.forEach(p=>(p.entries||[]).forEach(e=>all.push({p,e})));
+  if(!all.length){ el.innerHTML = `<p class="empty">No entries yet.</p>`; return; }
+  all.sort((a,b)=>new Date(b.e.date)-new Date(a.e.date));
+  const rows = all.slice(0,20).map(({p,e})=>{
+    const b = bmi(e.kg, p.cm);
+    // find previous entry for this person
+    const mine = (p.entries||[]).slice().sort((a,c)=>new Date(a.date)-new Date(c.date));
+    const idx = mine.findIndex(x=>x.id===e.id);
+    let trend = "";
+    if(idx>0){ const d = e.kg - mine[idx-1].kg;
+      trend = d<0?`<span class="trend-up">&#9660; ${Math.abs(d).toFixed(1)}kg</span>`
+            : d>0?`<span class="trend-down">&#9650; ${d.toFixed(1)}kg</span>`:"&middot;"; }
+    let wDisp;
+    if(unit==="metric") wDisp = `${e.kg.toFixed(1)} kg`;
+    else { const {st,lb}=kgToStLb(e.kg); wDisp=`${st}st ${lb.toFixed(1)}lb`; }
+    let waistDisp = "&middot;";
+    if(e.waist!=null){
+      const [risk,col] = waistRisk(e.waist, p.sex||"m");
+      const wv = unit==="metric" ? `${e.waist.toFixed(0)}cm` : `${(e.waist/2.54).toFixed(0)}in`;
+      waistDisp = `${wv} <span style="color:${col};font-weight:700">&bull;</span>`;
+    }
+    return `<tr>
+      <td><span class="swatch" style="display:inline-block;background:${p.color};margin-right:6px"></span>${escapeHtml(p.name)}</td>
+      <td>${new Date(e.date).toLocaleDateString(undefined,{day:'numeric',month:'short'})}</td>
+      <td>${wDisp}</td>
+      <td>${b.toFixed(1)}</td>
+      <td>${waistDisp}</td>
+      <td>${trend}</td>
+    </tr>`;
+  }).join("");
+  el.innerHTML = `<table class="log-table">
+    <thead><tr><th>Who</th><th>Date</th><th>Weight</th><th>BMI</th><th>Waist</th><th>Since last</th></tr></thead>
+    <tbody>${rows}</tbody></table>`;
+}
+
+function renderChart(){
+  const ctx = document.getElementById("chart");
+  const isWaist = chartMetric==="waist";
+  const metric = unit==="metric";
+  // Build a shared, sorted set of date labels across everyone so lines align on one x-axis.
+  const allDates = new Set();
+  state.people.forEach(p=>(p.entries||[]).forEach(e=>{
+    if(!isWaist || e.waist!=null) allDates.add(e.date);
+  }));
+  const labels = [...allDates].sort();
+  const labelText = labels.map(d=>new Date(d).toLocaleDateString(undefined,{day:'numeric',month:'short'}));
+
+  const datasets = state.people.map(p=>{
+    const byDate = {};
+    (p.entries||[]).forEach(e=>{
+      if(isWaist){ if(e.waist!=null) byDate[e.date] = metric ? +e.waist.toFixed(1) : +(e.waist/2.54).toFixed(1); }
+      else byDate[e.date] = +bmi(e.kg,p.cm).toFixed(2);
+    });
+    if(!Object.keys(byDate).length) return null;
+    const data = labels.map(d=> d in byDate ? byDate[d] : null);
+    return { label:p.name, data, borderColor:p.color, backgroundColor:p.color,
+      tension:.3, borderWidth:3, pointRadius:4, pointHoverRadius:6, spanGaps:true };
+  }).filter(Boolean);
+
+  const yTitle = isWaist ? (metric?"Waist (cm)":"Waist (in)") : "BMI";
+  const data = { labels:labelText, datasets };
+  if(chart){ chart.data = data; chart.options.scales.y.title.text = yTitle; chart.update(); return; }
+  chart = new Chart(ctx,{
+    type:"line", data,
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:"nearest",intersect:false},
+      scales:{
+        x:{ grid:{color:"#f0e8da"},
+            ticks:{color:"#7c7566",font:{family:'Helvetica Neue'}} },
+        y:{ title:{display:true,text:yTitle,color:"#7c7566"}, grid:{color:"#f0e8da"},
+            ticks:{color:"#7c7566",font:{family:'Helvetica Neue'}} }
+      },
+      plugins:{
+        legend:{labels:{font:{family:'Helvetica Neue',weight:'700'},color:"#1d2333",usePointStyle:true}},
+        tooltip:{}
+      }
+    }
+  });
+}
+
+function updateBmiPreview(){
+  const el = document.getElementById("bmiPreview");
+  const pid = document.getElementById("logPerson").value;
+  const p = state.people.find(x=>x.id===pid);
+  const kg = readWeightKg();
+  if(!p || !kg){ el.innerHTML=""; return; }
+  const b = bmi(kg, p.cm);
+  const [cat,col] = bmiCategory(b);
+  let html = `Projected BMI <b>${b.toFixed(1)}</b>
+    <span class="bmi-cat" style="background:${col}22;color:${col}">${cat}</span>`;
+  const waistCm = readWaistCm();
+  if(waistCm){
+    const [risk,wc] = waistRisk(waistCm, p.sex||"m");
+    html += `<div style="margin-top:8px">Waist
+      <span class="bmi-cat" style="background:${wc}22;color:${wc}">${risk}</span></div>`;
+  }
+  el.innerHTML = html;
+}
+
+/* ---------------- input reading ---------------- */
+function readWeightKg(){
+  if(unit==="metric"){ const v=parseFloat(document.getElementById("w1").value); return v>0?v:null; }
+  const st=parseFloat(document.getElementById("w1").value)||0;
+  const lb=parseFloat(document.getElementById("w2").value)||0;
+  const totalLb = st*14 + lb;
+  return totalLb>0 ? totalLb/2.2046226 : null;
+}
+function readHeightCm(){
+  if(unit==="metric"){ const v=parseFloat(document.getElementById("h1").value); return v>0?v:null; }
+  const ft=parseFloat(document.getElementById("h1").value)||0;
+  const inch=parseFloat(document.getElementById("h2").value)||0;
+  const totalIn = ft*12 + inch;
+  return totalIn>0 ? totalIn*2.54 : null;
+}
+function readWaistCm(){
+  const v=parseFloat(document.getElementById("waist").value);
+  if(!(v>0)) return null;
+  return unit==="metric" ? v : v*2.54; // imperial waist entered in inches
+}
+
+/* ---------------- unit UI swap ---------------- */
+function applyUnitUI(){
+  document.querySelectorAll("#unitToggle button").forEach(b=>b.classList.toggle("active", b.dataset.u===unit));
+  const metric = unit==="metric";
+  document.getElementById("w2").style.display = metric?"none":"block";
+  document.getElementById("h2").style.display = metric?"none":"block";
+  document.getElementById("w1").placeholder = metric?"kg":"st";
+  document.getElementById("w2").placeholder = "lb";
+  document.getElementById("h1").placeholder = metric?"cm":"ft";
+  document.getElementById("h2").placeholder = "in";
+  document.getElementById("weightLbl").textContent = metric?"Weight (kg)":"Weight (st / lb)";
+  document.getElementById("heightLbl").textContent = metric?"Height (cm)":"Height (ft / in)";
+  document.getElementById("waistLbl").innerHTML = metric?"Waist &mdash; optional (cm)":"Waist &mdash; optional (in)";
+  document.getElementById("waist").placeholder = metric?"around the belly button":"inches, around belly button";
+}
+
+/* ---------------- actions ---------------- */
+document.getElementById("unitToggle").onclick = (e)=>{
+  const b = e.target.closest("button"); if(!b) return;
+  unit = b.dataset.u; applyUnitUI();
+  if(chart){ chart.destroy(); chart=null; }
+  render();
+};
+
+document.getElementById("metricToggle").onclick = (e)=>{
+  const b = e.target.closest("button"); if(!b) return;
+  chartMetric = b.dataset.m;
+  document.querySelectorAll("#metricToggle button").forEach(x=>x.classList.toggle("active", x.dataset.m===chartMetric));
+  document.getElementById("chartTitle").innerHTML = chartMetric==="bmi"
+    ? "The Race &middot; BMI over time" : "The Race &middot; Waist over time";
+  if(chart){ chart.destroy(); chart=null; }
+  renderChart();
+};
+
+document.getElementById("addPersonBtn").onclick = ()=>{
+  const name = document.getElementById("pName").value.trim();
+  const cm = readHeightCm();
+  if(!name){ toast("Give them a name","lose"); return; }
+  if(!cm){ toast("Enter a height","lose"); return; }
+  const color = PALETTE[state.people.length % PALETTE.length];
+  const sex = document.getElementById("pSex").value;
+  state.people.push({ id:uid(), name, cm:+cm.toFixed(1), sex, color, entries:[] });
+  document.getElementById("pName").value="";
+  document.getElementById("h1").value=""; document.getElementById("h2").value="";
+  toast(`${name} joins the Weigh Off!`);
+  render();
+};
+
+document.getElementById("logBtn").onclick = ()=>{
+  const pid = document.getElementById("logPerson").value;
+  const p = state.people.find(x=>x.id===pid);
+  if(!p){ toast("Add a contender first","lose"); return; }
+  const kg = readWeightKg();
+  if(!kg){ toast("Enter a weight","lose"); return; }
+
+  const prev = (p.entries||[]).slice().sort((a,b)=>new Date(a.date)-new Date(b.date)).pop();
+  p.entries = p.entries||[];
+  const waistCm = readWaistCm();
+  const entry = { id:uid(), date:new Date().toISOString().slice(0,10), kg:+kg.toFixed(1) };
+  if(waistCm) entry.waist = +waistCm.toFixed(1);
+  p.entries.push(entry);
+  document.getElementById("w1").value=""; document.getElementById("w2").value="";
+  document.getElementById("waist").value="";
+
+  if(prev){
+    const dW = kg - prev.kg;
+    // Compare against the most recent previous entry that also had a waist reading.
+    const prevWaistEntry = (p.entries||[]).slice(0,-1).reverse().find(e=>e.waist!=null);
+    const dWaist = (waistCm!=null && prevWaistEntry) ? (waistCm - prevWaistEntry.waist) : null;
+
+    const weightDown = dW < -0.05, weightUp = dW > 0.05;
+    const waistDown = dWaist!=null && dWaist < -0.15, waistUp = dWaist!=null && dWaist > 0.15;
+
+    // Build a message covering whatever moved.
+    const parts = [];
+    if(weightDown) parts.push(`down ${Math.abs(dW).toFixed(1)}kg`);
+    else if(weightUp) parts.push(`up ${dW.toFixed(1)}kg`);
+    if(waistDown) parts.push(`waist &minus;${Math.abs(dWaist).toFixed(1)}cm`);
+    else if(waistUp) parts.push(`waist +${dWaist.toFixed(1)}cm`);
+
+    if(weightDown || waistDown){
+      celebrate();
+      toast(parts.length?`${cap(parts.join(', '))} &mdash; smashing it!`:"Nice one!","win",true);
+    } else if(weightUp || waistUp){
+      commiserate();
+      toast(parts.length?`${cap(parts.join(', '))} &mdash; next time!`:"Next time!","lose",true);
+    } else {
+      toast("Holding steady.");
+    }
+  } else {
+    toast(`${p.name}'s starting numbers are in.`);
+  }
+  render();
+};
+function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+
+document.getElementById("logPerson").onchange = updateBmiPreview;
+document.getElementById("w1").oninput = updateBmiPreview;
+document.getElementById("w2").oninput = updateBmiPreview;
+document.getElementById("waist").oninput = updateBmiPreview;
+
+/* export / import / demo */
+document.getElementById("exportBtn").onclick = ()=>{
+  const blob = new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
+  const a = document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download="weigh-off-data.json"; a.click();
+};
+document.getElementById("importBtn").onclick = ()=>document.getElementById("importFile").click();
+document.getElementById("importFile").onchange = (e)=>{
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader(); r.onload=()=>{ try{ const s=JSON.parse(r.result);
+    if(s&&s.people){ state=s; state.history=state.history||[]; unit=s.unit||unit; applyUnitUI(); if(chart){chart.destroy();chart=null;} archiveFinishedQuarters(); render(); toast("Data imported"); }
+  }catch(err){ toast("Couldn't read that file","lose"); } }; r.readAsText(f);
+};
+document.getElementById("demoBtn").onclick = ()=>{
+  if(state.people.length && !confirm("This replaces the SHARED board with demo data for everyone. Continue?")) return;
+  const today = new Date();
+  const daysAgo = n => new Date(today.getTime()-n*86400000).toISOString().slice(0,10);
+  // ~200 days of fortnightly weigh-ins so a full quarter has already closed
+  // (populates the Hall of Fame) and steady losers rack up gold stars.
+  function series(startKg, startWaist, kgPerFn, waistPerFn, jitter){
+    const es=[]; let kg=startKg, waist=startWaist;
+    for(let d=196; d>=0; d-=14){
+      const wobble = (Math.random()-0.5)*jitter;
+      es.push({id:uid(), date:daysAgo(d), kg:+(kg+wobble).toFixed(1), waist:+waist.toFixed(1)});
+      kg -= kgPerFn; waist -= waistPerFn;
+    }
+    return es;
+  }
+  state = { unit, history:[], people:[
+    // Dave: steady, consistent loser -> lots of gold stars
+    { id:uid(), name:"Dave", cm:178, sex:"m", color:PALETTE[0], entries:series(112,118,0.9,0.7,0.3) },
+    // Sam: stop-start, barely moves -> few stars, often on cooking duty
+    { id:uid(), name:"Sam", cm:170, sex:"m", color:PALETTE[1], entries:series(96,106,0.25,0.15,1.2) },
+    // Jo: strong steady loss
+    { id:uid(), name:"Jo", cm:165, sex:"f", color:PALETTE[2], entries:series(94,98,0.8,0.6,0.4) },
+  ]};
+  if(chart){chart.destroy();chart=null;}
+  archiveFinishedQuarters();
+  render(); toast("Demo data loaded"); celebrate();
+};
+
+/* ---------------- toast ---------------- */
+let toastTimer;
+function toast(msg, kind="", big=false){
+  const t=document.getElementById("toast");
+  t.className = kind; t.innerHTML = big?`<span class="big">${msg}</span>`:msg;
+  requestAnimationFrame(()=>t.classList.add("show"));
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove("show"),2600);
+}
+
+/* ---------------- fireworks (loss) ---------------- */
+const fxCanvas=document.getElementById("fx"), fxCtx=fxCanvas.getContext("2d");
+let particles=[], fxRAF=null;
+function sizeFx(){ fxCanvas.width=innerWidth; fxCanvas.height=innerHeight; }
+addEventListener("resize", sizeFx); sizeFx();
+
+function burst(x,y){
+  const n=42;
+  for(let i=0;i<n;i++){
+    const ang=(Math.PI*2*i)/n + Math.random()*.3;
+    const sp=2+Math.random()*5;
+    particles.push({x,y,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,
+      life:1,color:PALETTE[(Math.random()*PALETTE.length)|0],size:2+Math.random()*3,g:.06});
+  }
+}
+function sparkle(x,y){
+  for(let i=0;i<10;i++){
+    particles.push({x,y,vx:(Math.random()-.5)*2,vy:(Math.random()-.5)*2,
+      life:1,color:"#fff3b0",size:1+Math.random()*2,g:0,twinkle:true});
+  }
+}
+function celebrate(){
+  fxCanvas.style.display="block";
+  const cx=innerWidth/2;
+  burst(cx, innerHeight*0.35);
+  setTimeout(()=>burst(cx-160, innerHeight*0.28),180);
+  setTimeout(()=>burst(cx+160, innerHeight*0.30),340);
+  setTimeout(()=>{ for(let i=0;i<14;i++) sparkle(Math.random()*innerWidth, Math.random()*innerHeight*.6); },200);
+  if(!fxRAF) fxLoop();
+}
+function fxLoop(){
+  fxCtx.clearRect(0,0,fxCanvas.width,fxCanvas.height);
+  particles.forEach(p=>{
+    p.x+=p.vx; p.y+=p.vy; p.vy+=p.g; p.life-=0.016;
+    fxCtx.globalAlpha=Math.max(p.life,0);
+    fxCtx.fillStyle=p.color;
+    fxCtx.beginPath();
+    if(p.twinkle){ const s=p.size*(0.5+Math.abs(Math.sin(Date.now()/80+p.x))); fxCtx.arc(p.x,p.y,s,0,7); }
+    else fxCtx.arc(p.x,p.y,p.size,0,7);
+    fxCtx.fill();
+  });
+  fxCtx.globalAlpha=1;
+  particles=particles.filter(p=>p.life>0);
+  if(particles.length) fxRAF=requestAnimationFrame(fxLoop);
+  else { fxRAF=null; fxCanvas.style.display="none"; }
+}
+
+/* ---------------- commiserate (gain): gentle rain ---------------- */
+function commiserate(){
+  fxCanvas.style.display="block";
+  for(let i=0;i<50;i++){
+    particles.push({x:Math.random()*innerWidth, y:-20-Math.random()*200,
+      vx:-0.4, vy:3+Math.random()*3, life:1.4, color:"#8fb3d9", size:1.5, g:0.02, rain:true});
+  }
+  if(!fxRAF) fxLoop();
+}
+
+/* ---------------- util ---------------- */
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ---------------- login ---------------- */
+function showLogin(){
+  document.getElementById("loginOverlay").style.display = "flex";
+  document.getElementById("passInput").focus();
+}
+function hideLogin(){ document.getElementById("loginOverlay").style.display = "none"; }
+async function doLogin(){
+  const pass = document.getElementById("passInput").value;
+  const err = document.getElementById("loginErr");
+  try{
+    const res = await fetch("/api/login", {
+      method:"POST", headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ passphrase: pass })
+    });
+    if(!res.ok){ err.textContent = "Wrong passphrase — try again."; return; }
+    const { token } = await res.json();
+    TOKEN = token; localStorage.setItem(TOKEN_KEY, token);
+    err.textContent = "";
+    document.getElementById("passInput").value = "";
+    hideLogin();
+    await boot();
+  }catch(e){ err.textContent = "Couldn't reach the server."; }
+}
+document.getElementById("loginBtn").onclick = doLogin;
+document.getElementById("passInput").addEventListener("keydown", e=>{ if(e.key==="Enter") doLogin(); });
+
+/* ---------------- init ---------------- */
+async function boot(){
+  applyUnitUI();
+  try{
+    state = await load();
+  }catch(e){ return; } // showLogin() already fired on 401
+  archiveFinishedQuarters();
+  render();
+}
+applyUnitUI();
+boot();
+</script>
+</body>
+</html>
