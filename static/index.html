@@ -193,6 +193,41 @@
   #toast.lose{background:var(--lose)}
   #toast .big{font-size:20px;display:block}
 
+  /* ---------- mobile / small screens ---------- */
+  @media (max-width:640px){
+    .wrap{padding:18px 14px 40px}
+    .card{padding:16px;border-radius:14px}
+    /* Toolbar: stack toggle and countdown, give them room */
+    .toolbar{flex-direction:column;align-items:stretch;gap:10px}
+    .unit-toggle{width:100%;justify-content:center}
+    .unit-toggle button{flex:1;padding:11px 10px;font-size:13px}
+    .quarter-badge{text-align:center}
+    /* Chart-metric toggle comfortable to tap */
+    #metricToggle button{padding:8px 14px;font-size:12px}
+    /* Let the chart card header wrap so title + toggle don't crowd */
+    .card h2{flex-wrap:wrap;gap:8px}
+    /* Forms: stack the paired fields so number keyboards aren't cramped */
+    .row2, .row3{grid-template-columns:1fr;gap:8px}
+    input, select{font-size:16px;padding:13px 12px}  /* 16px stops iOS zoom-on-focus */
+    label.fld{font-size:12px;margin-top:14px}
+    .btn{padding:15px 16px;font-size:15px}
+    /* Bigger tap targets for remove + mini buttons */
+    .icon-btn{font-size:22px;padding:8px 10px}
+    .btn.mini{padding:11px 16px;font-size:13px}
+    /* Wide tables scroll sideways instead of crushing */
+    #logArea, #careerArea{overflow-x:auto;-webkit-overflow-scrolling:touch}
+    .log-table, .career-tbl{min-width:460px}
+    /* Leaderboard rows: a touch more breathing room */
+    .lb-row{padding:14px 2px;gap:10px}
+    .lb-name{font-size:15px;white-space:normal}
+    .rank{font-size:18px;width:22px}
+    .login-card{padding:22px}
+  }
+  /* On very small phones, let the chart be a little taller so it's readable */
+  @media (max-width:640px){
+    .chart-wrap{height:clamp(240px,52vh,340px)}
+  }
+
   @media print{
     .toolbar,.person-panel,.btn,#fx,#toast{display:none!important}
     body{background:#fff}
@@ -787,12 +822,12 @@ function applyUnitUI(){
   const metric = unit==="metric";
   document.getElementById("w2").style.display = metric?"none":"block";
   document.getElementById("h2").style.display = metric?"none":"block";
-  document.getElementById("w1").placeholder = metric?"kg":"st";
-  document.getElementById("w2").placeholder = "lb";
-  document.getElementById("h1").placeholder = metric?"cm":"ft";
-  document.getElementById("h2").placeholder = "in";
-  document.getElementById("weightLbl").textContent = metric?"Weight (kg)":"Weight (st / lb)";
-  document.getElementById("heightLbl").textContent = metric?"Height (cm)":"Height (ft / in)";
+  document.getElementById("w1").placeholder = metric?"kg":"stone";
+  document.getElementById("w2").placeholder = metric?"":"pounds";
+  document.getElementById("h1").placeholder = metric?"cm":"feet";
+  document.getElementById("h2").placeholder = "inches";
+  document.getElementById("weightLbl").textContent = metric?"Weight (kg)":"Weight (stone + pounds)";
+  document.getElementById("heightLbl").textContent = metric?"Height (cm)":"Height (feet + inches)";
   document.getElementById("waistLbl").innerHTML = metric?"Waist &mdash; optional (cm)":"Waist &mdash; optional (in)";
   document.getElementById("waist").placeholder = metric?"around the belly button":"inches, around belly button";
 }
@@ -835,6 +870,17 @@ document.getElementById("logBtn").onclick = ()=>{
   if(!p){ toast("Add a contender first","lose"); return; }
   const kg = readWeightKg();
   if(!kg){ toast("Enter a weight","lose"); return; }
+
+  // Plausibility guard: a mis-entered weight (e.g. "20" read as 20 stone, or 20 lb
+  // for an adult) produces an impossible BMI. Catch it before it lands on the board.
+  const bmiCheck = bmi(kg, p.cm);
+  if(bmiCheck < 10 || bmiCheck > 70){
+    const shown = unit==="metric"
+      ? `${kg.toFixed(1)} kg`
+      : (()=>{ const {st,lb}=kgToStLb(kg); return `${st} st ${lb.toFixed(0)} lb (${(kg*2.2046226).toFixed(0)} lb)`; })();
+    toast(`That reads as ${shown} &mdash; BMI ${bmiCheck.toFixed(1)}. Check the units and try again.`,"lose",true);
+    return;
+  }
 
   const prev = (p.entries||[]).slice().sort((a,b)=>new Date(a.date)-new Date(b.date)).pop();
   p.entries = p.entries||[];
@@ -930,7 +976,10 @@ function toast(msg, kind="", big=false){
   t.className = kind; t.innerHTML = big?`<span class="big">${msg}</span>`:msg;
   requestAnimationFrame(()=>t.classList.add("show"));
   clearTimeout(toastTimer);
-  toastTimer=setTimeout(()=>t.classList.remove("show"),2600);
+  // Celebration / commiseration messages (big) linger to reinforce the moment;
+  // ordinary notices clear quickly.
+  const duration = big ? 6500 : 2600;
+  toastTimer=setTimeout(()=>t.classList.remove("show"),duration);
 }
 
 /* ---------------- fireworks (loss) ---------------- */
@@ -945,28 +994,42 @@ function burst(x,y){
     const ang=(Math.PI*2*i)/n + Math.random()*.3;
     const sp=2+Math.random()*5;
     particles.push({x,y,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,
-      life:1,color:PALETTE[(Math.random()*PALETTE.length)|0],size:2+Math.random()*3,g:.06});
+      life:1,decay:0.011,color:PALETTE[(Math.random()*PALETTE.length)|0],size:2+Math.random()*3,g:.05});
   }
 }
 function sparkle(x,y){
   for(let i=0;i<10;i++){
     particles.push({x,y,vx:(Math.random()-.5)*2,vy:(Math.random()-.5)*2,
-      life:1,color:"#fff3b0",size:1+Math.random()*2,g:0,twinkle:true});
+      life:1,decay:0.012,color:"#fff3b0",size:1+Math.random()*2,g:0,twinkle:true});
   }
 }
 function celebrate(){
   fxCanvas.style.display="block";
   const cx=innerWidth/2;
-  burst(cx, innerHeight*0.35);
-  setTimeout(()=>burst(cx-160, innerHeight*0.28),180);
-  setTimeout(()=>burst(cx+160, innerHeight*0.30),340);
-  setTimeout(()=>{ for(let i=0;i<14;i++) sparkle(Math.random()*innerWidth, Math.random()*innerHeight*.6); },200);
+  // A sustained ~5s show: staggered bursts across the screen plus ongoing sparkles.
+  const shots = [
+    [cx,           innerHeight*0.35, 0],
+    [cx-180,       innerHeight*0.28, 180],
+    [cx+180,       innerHeight*0.30, 340],
+    [cx-60,        innerHeight*0.22, 900],
+    [cx+120,       innerHeight*0.34, 1300],
+    [cx-200,       innerHeight*0.40, 1900],
+    [cx+220,       innerHeight*0.26, 2500],
+    [cx,           innerHeight*0.32, 3100],
+    [cx-120,       innerHeight*0.24, 3700],
+    [cx+80,        innerHeight*0.38, 4200],
+  ];
+  shots.forEach(([x,y,delay])=> setTimeout(()=>burst(x,y), delay));
+  // Sparkle waves sprinkled throughout the 5 seconds.
+  for(let t=200; t<=4400; t+=550){
+    setTimeout(()=>{ for(let i=0;i<12;i++) sparkle(Math.random()*innerWidth, Math.random()*innerHeight*.65); }, t);
+  }
   if(!fxRAF) fxLoop();
 }
 function fxLoop(){
   fxCtx.clearRect(0,0,fxCanvas.width,fxCanvas.height);
   particles.forEach(p=>{
-    p.x+=p.vx; p.y+=p.vy; p.vy+=p.g; p.life-=0.016;
+    p.x+=p.vx; p.y+=p.vy; p.vy+=p.g; p.life-=(p.decay||0.016);
     fxCtx.globalAlpha=Math.max(p.life,0);
     fxCtx.fillStyle=p.color;
     fxCtx.beginPath();
