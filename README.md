@@ -1,4 +1,4 @@
-# The Weigh Off
+    # The Weigh Off
 
 A friendly, self-hosted weight/BMI/waist tracker for a small group. Runs on your
 own Debian box with **zero third-party services** and **no pip dependencies** —
