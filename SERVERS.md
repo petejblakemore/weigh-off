@@ -28,15 +28,19 @@ When in doubt: *"Is it a running service, or a thing I hack on?"* — that answe
 - **systemd unit:** `weigh-off.service` → `/etc/systemd/system/weigh-off.service`
 - **Listens on:** `127.0.0.1:8770` (not exposed directly)
 - **Public URL:** **`https://weigh-off.uk`** — reached via **Cloudflare Tunnel** (see below), NOT port forwarding
-- **Data file:** `/opt/weigh-off-server/weighoff.db` (SQLite)
+- **Data file:** `/opt/weigh-off-server/weighoff.db` (SQLite) — **gitignored**; friends' real data
 - **Secret:** `WEIGHOFF_PASSPHRASE` set in the systemd unit (NOT in git) — this is the only front door to a public app
-- **Git repo:** `https://github.com/petejblakemore/weigh-off` (private)
+- **Git repo:** `https://github.com/petejblakemore/weigh-off` — **PUBLIC** (no secrets in code; passphrase is in the unit, DB is gitignored)
 - **Runtime:** Python 3 standard library only — no dependencies to install
+- **All files owned by `weighoff:weighoff`** — deploy AS that user (see below), never as `pete`
 
-**Common commands**
+**Deploy (ALWAYS run as the weighoff user, over HTTPS):**
 ```bash
-# deploy an update
-cd /opt/weigh-off-server && git pull && sudo systemctl restart weigh-off
+sudo -u weighoff git -C /opt/weigh-off-server pull && sudo systemctl restart weigh-off
+```
+
+**Other common commands**
+```bash
 # status / logs
 sudo systemctl status weigh-off
 journalctl -u weigh-off -f
@@ -158,7 +162,56 @@ is the record that makes it so.
 
 - [ ] Monthly: back up `weighoff.db`; confirm CMMS `backup.sh` is running (cron/timer) and the NAS is mounted
 - [ ] After any deploy: confirm `systemctl status` is `active (running)` (weigh-off, cloudflared) / uvicorn is up (CMMS)
-- [ ] Deploy pending Weigh Off changes (units fix, longer messages, longer fireworks, mobile pass): `git pull` + `sudo systemctl restart weigh-off`
+- [x] Deploy Weigh Off v1 batch (units fix, plausibility guard, longer messages, 5s fireworks, mobile layout, demo-button removed) — **live 2026-08-19**
+- [ ] Run `sudo systemctl disable --now caddy` to formally retire Caddy on the box
+- [ ] Tidy stray `/opt/weigh-off-server/.ssh/` (leftover known_hosts from the SSH attempt; untracked, harmless)
 - [ ] When adding anything new: add it to this file **before** you forget the details
 - [ ] Keep secrets (passphrases, keys, `CMMS_SECRET_KEY`) in systemd units or `.env` files, never in git
 - [ ] Tidy the remaining CMMS security items above (strip the old key literal from `startup.sh` in git; confirm `.pem` files are gitignored)
+
+---
+
+## Gotchas & lessons learned (read before touching hosting again)
+
+**These cost real time to work out. Don't rediscover them.**
+
+1. **This line CANNOT do inbound port forwarding.** The EE Smart Hub 2 (SH31B) reserves
+   ports 80/443 for its own management and offers no way to disable remote access
+   (TR-069 keeps it on). Every inbound approach — Caddy + Let's Encrypt HTTP-01/TLS-ALPN,
+   direct port forwards — fails with "Timeout during connect." The public IP is real
+   (`curl -4 ifconfig.me` matched, no CGNAT), but the hub swallows inbound regardless.
+   **Answer: Cloudflare Tunnel (outbound-only). Never fight the router again.**
+
+2. **Deploy as `weighoff`, not `pete`.** The repo and files are owned by `weighoff`
+   (the service user). Running `git pull` as `pete` causes:
+   - `fatal: detected dubious ownership` (fixed once via `git config --global --add safe.directory`)
+   - `error: unable to create file … Permission denied` (pete can't write weighoff-owned files)
+   - stray `pete`-owned files (e.g. `.git/FETCH_HEAD`) that then block the *next* pull
+   **Fix that was applied:** `sudo chown -R weighoff:weighoff /opt/weigh-off-server`, and
+   from now on deploy only via `sudo -u weighoff git -C … pull`.
+
+3. **The repo remote must be HTTPS, not SSH.** The `weighoff` user has no SSH key, so
+   `git@github.com:…` gives "Permission denied (publickey)". The remote is set to
+   `https://github.com/petejblakemore/weigh-off.git`, and the repo is **public**, so
+   HTTPS pulls need no auth. (If it were private, HTTPS as a login-less user needs a
+   token baked into the URL — avoided by keeping it public.)
+
+4. **"Local changes would be overwritten by merge" on the box** usually means a change
+   was made directly on the box that also exists in the incoming commit. Check with
+   `git diff`; if it's a duplicate/junk, `git checkout -- <file>` then pull. The Mac +
+   GitHub is the source of truth — the box is only a deployment target, so discarding
+   the box's local edits is safe.
+
+5. **Let's Encrypt rate-limits failed attempts** (5 failures/hour/identifier). While
+   debugging, don't keep restarting Caddy against a broken setup — it burns attempts and
+   locks you out for an hour. (Moot now Caddy's retired, but the principle holds for any
+   ACME retries.) Use `python3 -m http.server 80` + a phone on mobile data to test the
+   path for free, without touching Let's Encrypt.
+
+6. **`blakemore.me.uk` was deliberately NOT used** (it's live email + blog; moving its
+   nameservers risked breaking mail). A separate domain, `weigh-off.uk`, was registered
+   at Cloudflare Registrar specifically so DNS is auto-managed with zero nameserver changes.
+
+7. **In the tunnel route, service type is HTTP not HTTPS** → `localhost:8770`. The box
+   speaks plain HTTP internally; Cloudflare adds the public HTTPS. Selecting HTTPS there
+   causes a 502.

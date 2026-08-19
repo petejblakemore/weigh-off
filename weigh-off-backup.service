@@ -1,0 +1,8 @@
+[Unit]
+Description=Nightly backup of The Weigh Off database
+
+[Service]
+Type=oneshot
+ExecStart=/opt/weigh-off-server/deploy/backup.sh
+# Runs as pete so backups land in /home/pete/backups and match your other backups.
+User=pete
