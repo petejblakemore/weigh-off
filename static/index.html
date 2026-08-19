@@ -351,7 +351,6 @@
         <div style="display:flex;gap:8px">
           <button class="btn mini ghost" id="exportBtn">Export</button>
           <button class="btn mini ghost" id="importBtn">Import</button>
-          <button class="btn mini" id="demoBtn">Demo data</button>
         </div>
         <input type="file" id="importFile" accept="application/json" style="display:none">
       </div>
@@ -940,33 +939,6 @@ document.getElementById("importFile").onchange = (e)=>{
   const r=new FileReader(); r.onload=()=>{ try{ const s=JSON.parse(r.result);
     if(s&&s.people){ state=s; state.history=state.history||[]; unit=s.unit||unit; applyUnitUI(); if(chart){chart.destroy();chart=null;} archiveFinishedQuarters(); render(); toast("Data imported"); }
   }catch(err){ toast("Couldn't read that file","lose"); } }; r.readAsText(f);
-};
-document.getElementById("demoBtn").onclick = ()=>{
-  if(state.people.length && !confirm("This replaces the SHARED board with demo data for everyone. Continue?")) return;
-  const today = new Date();
-  const daysAgo = n => new Date(today.getTime()-n*86400000).toISOString().slice(0,10);
-  // ~200 days of fortnightly weigh-ins so a full quarter has already closed
-  // (populates the Hall of Fame) and steady losers rack up gold stars.
-  function series(startKg, startWaist, kgPerFn, waistPerFn, jitter){
-    const es=[]; let kg=startKg, waist=startWaist;
-    for(let d=196; d>=0; d-=14){
-      const wobble = (Math.random()-0.5)*jitter;
-      es.push({id:uid(), date:daysAgo(d), kg:+(kg+wobble).toFixed(1), waist:+waist.toFixed(1)});
-      kg -= kgPerFn; waist -= waistPerFn;
-    }
-    return es;
-  }
-  state = { unit, history:[], people:[
-    // Dave: steady, consistent loser -> lots of gold stars
-    { id:uid(), name:"Dave", cm:178, sex:"m", color:PALETTE[0], entries:series(112,118,0.9,0.7,0.3) },
-    // Sam: stop-start, barely moves -> few stars, often on cooking duty
-    { id:uid(), name:"Sam", cm:170, sex:"m", color:PALETTE[1], entries:series(96,106,0.25,0.15,1.2) },
-    // Jo: strong steady loss
-    { id:uid(), name:"Jo", cm:165, sex:"f", color:PALETTE[2], entries:series(94,98,0.8,0.6,0.4) },
-  ]};
-  if(chart){chart.destroy();chart=null;}
-  archiveFinishedQuarters();
-  render(); toast("Demo data loaded"); celebrate();
 };
 
 /* ---------------- toast ---------------- */
