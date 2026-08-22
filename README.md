@@ -139,5 +139,4 @@ Browser  ──HTTPS──►  Caddy (:443)  ──proxy──►  server.py (12
 
 One shared passphrase gates the whole app; there are no per-person accounts, so
 anyone with the passphrase can edit anyone's weigh-ins. That's a deliberate,
-friend-sized trade-off. If it ever needs tightening, the natural next step is
-per-person accounts — ask and it can be added.
+friend-sized trade-off. 
